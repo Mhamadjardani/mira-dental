@@ -296,10 +296,13 @@ export class PostgresStore implements Store {
 
 const g = globalThis as unknown as { __miraStore?: Store };
 
-/** Postgres when DATABASE_URL is set, otherwise an in-memory store. */
+/** Connection string: DATABASE_URL, or the name Vercel's Neon/Postgres integration uses. */
+export const databaseUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+
+/** Postgres when a database URL is set, otherwise an in-memory store. */
 export function getStore(): Store {
   if (!g.__miraStore) {
-    g.__miraStore = process.env.DATABASE_URL ? new PostgresStore(process.env.DATABASE_URL) : new MemoryStore();
+    g.__miraStore = databaseUrl() ? new PostgresStore(databaseUrl()) : new MemoryStore();
   }
   return g.__miraStore;
 }

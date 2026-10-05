@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { DENTISTS, SERVICES, getDentist, getService } from "@/lib/clinic";
-import { getStore } from "@/lib/store";
+import { databaseUrl, getStore } from "@/lib/store";
 import { clinicNow, addDays, formatDate } from "@/lib/time";
 import { isAdmin, isDemoAdmin, maskName, maskPhone } from "@/lib/admin";
 import { getProviderChain } from "@/lib/agent/providers";
@@ -61,7 +61,7 @@ export default async function Admin({ params, searchParams }: PageProps<"/[local
         <div>
           <h1 className="text-3xl font-bold">Front desk</h1>
           <p className="text-sm text-muted">
-            {formatDate(now.date, "en")} · AI model: {provider ? provider.name : "not configured"} · Storage: {process.env.DATABASE_URL ? "Postgres" : "in-memory (demo)"}
+            {formatDate(now.date, "en")} · AI model: {provider ? provider.name : "not configured"} · Storage: {databaseUrl() ? "Postgres" : "in-memory (demo)"}
           </p>
         </div>
         {mask && <span className="rounded-full bg-sand px-3 py-1.5 text-xs font-medium">Demo mode · personal data masked</span>}
