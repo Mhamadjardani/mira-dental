@@ -61,7 +61,7 @@ export default async function Admin({ params, searchParams }: PageProps<"/[local
         <div>
           <h1 className="text-3xl font-bold">Front desk</h1>
           <p className="text-sm text-muted">
-            {formatDate(now.date, "en")} · AI model: {provider ? provider.name : "not configured"} · Storage: {databaseUrl() ? "Postgres" : "in-memory (demo)"}
+            {formatDate(now.date, "en")} · AI: {provider ? describeChain(provider.name) : "not configured"} · Storage: {databaseUrl() ? "Postgres" : "in-memory (demo)"}
           </p>
         </div>
         {mask && <span className="rounded-full bg-sand px-3 py-1.5 text-xs font-medium">Demo mode · personal data masked</span>}
@@ -188,4 +188,11 @@ export default async function Admin({ params, searchParams }: PageProps<"/[local
       </div>
     </section>
   );
+}
+
+/** "gemini:a → gemini:b → groq:c" → "Gemini → Groq · 3 models" */
+function describeChain(name: string) {
+  const models = name.split(" → ");
+  const vendors = [...new Set(models.map((m) => m.split(":")[0]))].map((v) => v.charAt(0).toUpperCase() + v.slice(1));
+  return `${vendors.join(" → ")}${models.length > 1 ? ` · ${models.length} models` : ""}`;
 }

@@ -29,18 +29,50 @@ function sessionId(): string {
   }
 }
 
-/** Renders **bold** and line breaks from the model's plain text. */
-function RichText({ text }: { text: string }) {
+/** Renders **bold**, "- " / "* " bullet lists and line breaks from the model's plain text. */
+export function RichText({ text }: { text: string }) {
+  const inline = (line: string) =>
+    line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
+      part.startsWith("**") && part.endsWith("**") ? <strong key={j}>{part.slice(2, -2)}</strong> : <Fragment key={j}>{part}</Fragment>,
+    );
+  // Group consecutive bullet lines into one list; everything else is a paragraph line.
+  const blocks: { list: boolean; lines: string[] }[] = [];
+  for (const raw of text.trim().split("\n")) {
+    const bullet = /^\s*[-*•]\s+(.*)$/.exec(raw);
+    const last = blocks.at(-1);
+    if (bullet) {
+      if (last?.list) last.lines.push(bullet[1]);
+      else blocks.push({ list: true, lines: [bullet[1]] });
+    } else if (raw.trim() === "") {
+      blocks.push({ list: false, lines: [] });
+    } else if (last && !last.list && last.lines.length) {
+      last.lines.push(raw);
+    } else {
+      blocks.push({ list: false, lines: [raw] });
+    }
+  }
   return (
     <>
-      {text.split("\n").map((line, i) => (
-        <Fragment key={i}>
-          {i > 0 && <br />}
-          {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-            part.startsWith("**") && part.endsWith("**") ? <strong key={j}>{part.slice(2, -2)}</strong> : <Fragment key={j}>{part}</Fragment>,
-          )}
-        </Fragment>
-      ))}
+      {blocks
+        .filter((b) => b.lines.length)
+        .map((b, i) =>
+          b.list ? (
+            <ul key={i} className="my-1.5 list-disc space-y-0.5 ps-5 first:mt-0 last:mb-0">
+              {b.lines.map((l, j) => (
+                <li key={j}>{inline(l)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p key={i} className="mt-2 first:mt-0">
+              {b.lines.map((l, j) => (
+                <Fragment key={j}>
+                  {j > 0 && <br />}
+                  {inline(l)}
+                </Fragment>
+              ))}
+            </p>
+          ),
+        )}
     </>
   );
 }
