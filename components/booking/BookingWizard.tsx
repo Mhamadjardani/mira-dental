@@ -92,8 +92,8 @@ export function BookingWizard({
   const canSubmit = !!(serviceId && date && time && name.trim().length > 1 && phone.replace(/\D/g, "").length >= 7);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
-      <div className="space-y-8">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0 space-y-8">
         <Step n={1} title={t.step1} done={!!serviceId}>
           <div className="grid gap-3 sm:grid-cols-2">
             {services.map((s) => (
@@ -150,7 +150,7 @@ export function BookingWizard({
 
           {serviceId && (
             <Step key="day" n={3} title={t.step3} done={!!date}>
-              <DayPicker days={days} value={date} onChange={(d) => (setDate(d), setTime(null))} locale={locale} empty={t.noDays} loading={t.loading} />
+              <DayPicker days={days} value={date} onChange={(d) => (setDate(d), setTime(null))} locale={locale} empty={t.noDays} loading={t.loading} more={t.moreDays} />
             </Step>
           )}
 

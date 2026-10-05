@@ -127,7 +127,7 @@ export function ChatWidget({ locale, t }: { locale: Locale; t: Dict["chat"] }) {
         setBusy(false);
       }
     },
-    [busy, locale, say, speak],
+    [busy, locale, say, speak, t.failed],
   );
 
   function toggleMic() {

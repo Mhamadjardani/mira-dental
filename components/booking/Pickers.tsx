@@ -48,6 +48,8 @@ export function useSlots(serviceId: string | null, dentistId: string | null, dat
 const fmt = (locale: Locale, date: string, o: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat(locale === "ar" ? "ar-LB" : locale, { timeZone: "UTC", ...o }).format(new Date(date + "T12:00:00Z"));
 
+const FIRST_PAGE = 12;
+
 export function DayPicker({
   days,
   value,
@@ -55,6 +57,7 @@ export function DayPicker({
   locale,
   empty,
   loading,
+  more,
 }: {
   days: Day[] | null;
   value: string | null;
@@ -62,28 +65,41 @@ export function DayPicker({
   locale: Locale;
   empty: string;
   loading: string;
+  more: string;
 }) {
+  const [all, setAll] = useState(false);
   if (!days) return <Skeleton label={loading} />;
   if (!days.length) return <p className="rounded-2xl bg-sand p-4 text-sm">{empty}</p>;
+  // Keep a chosen later date visible even when the list is collapsed.
+  const selectedIndex = value ? days.findIndex((d) => d.date === value) : -1;
+  const shown = all ? days : days.slice(0, Math.max(FIRST_PAGE, selectedIndex + 1));
   return (
-    <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-2">
-      {days.map((d) => {
-        const active = d.date === value;
-        return (
-          <button
-            key={d.date}
-            type="button"
-            onClick={() => onChange(d.date)}
-            className={`relative flex min-w-[76px] snap-start flex-col items-center rounded-2xl border px-3 py-3 transition ${
-              active ? "border-brand bg-brand text-white shadow-lg shadow-brand/25" : "border-line bg-surface hover:border-brand/50"
-            }`}
-          >
-            <span className={`text-xs font-medium ${active ? "text-white/80" : "text-muted"}`}>{fmt(locale, d.date, { weekday: "short" })}</span>
-            <span className="text-xl font-bold">{fmt(locale, d.date, { day: "numeric" })}</span>
-            <span className={`text-[11px] ${active ? "text-white/80" : "text-muted"}`}>{fmt(locale, d.date, { month: "short" })}</span>
-          </button>
-        );
-      })}
+    <div>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        {shown.map((d) => {
+          const active = d.date === value;
+          return (
+            <button
+              key={d.date}
+              type="button"
+              onClick={() => onChange(d.date)}
+              aria-pressed={active}
+              className={`flex min-w-0 flex-col items-center rounded-2xl border px-1 py-2.5 transition ${
+                active ? "border-brand bg-brand text-white shadow-lg shadow-brand/25" : "border-line bg-surface hover:border-brand/50"
+              }`}
+            >
+              <span className={`text-xs font-medium ${active ? "text-white/80" : "text-muted"}`}>{fmt(locale, d.date, { weekday: "short" })}</span>
+              <span className="text-xl font-bold">{fmt(locale, d.date, { day: "numeric" })}</span>
+              <span className={`text-[11px] ${active ? "text-white/80" : "text-muted"}`}>{fmt(locale, d.date, { month: "short" })}</span>
+            </button>
+          );
+        })}
+      </div>
+      {!all && shown.length < days.length && (
+        <button type="button" onClick={() => setAll(true)} className="mt-3 text-sm font-semibold text-brand hover:text-brand-dark">
+          + {more} ({days.length - shown.length})
+        </button>
+      )}
     </div>
   );
 }

@@ -126,7 +126,7 @@ export function ManageBooking({
           <AnimatePresence>
             {mode === "move" && !status && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-5 overflow-hidden">
-                <DayPicker days={days} value={date} onChange={(d) => (setDate(d), setTime(null))} locale={locale} empty={book.noDays} loading={book.loading} />
+                <DayPicker days={days} value={date} onChange={(d) => (setDate(d), setTime(null))} locale={locale} empty={book.noDays} loading={book.loading} more={book.moreDays} />
                 {date && <TimePicker slots={slots} value={time} onChange={setTime} empty={book.noTimes} loading={book.loading} />}
                 <button
                   type="button"
