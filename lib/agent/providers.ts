@@ -154,27 +154,45 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
 /* ------------------------------ Selection ----------------------------- */
 
-export function getProvider(env: NodeJS.ProcessEnv = process.env): ModelProvider | null {
-  const choice = (env.AI_PROVIDER ?? "").toLowerCase();
-  const gemini = () =>
-    env.GEMINI_API_KEY ? new GeminiProvider(env.GEMINI_API_KEY, env.GEMINI_MODEL || "gemini-3.5-flash") : null;
-  const groq = () =>
-    env.GROQ_API_KEY
-      ? new OpenAICompatibleProvider("https://api.groq.com/openai/v1", env.GROQ_API_KEY, env.GROQ_MODEL || "llama-3.3-70b-versatile", "groq")
-      : null;
-  const compat = () =>
-    env.OPENAI_COMPAT_BASE_URL && env.OPENAI_COMPAT_MODEL
-      ? new OpenAICompatibleProvider(env.OPENAI_COMPAT_BASE_URL, env.OPENAI_COMPAT_API_KEY ?? "none", env.OPENAI_COMPAT_MODEL)
-      : null;
+const GROQ_URL = "https://api.groq.com/openai/v1";
+/** Free-tier model names change; each provider gets a short list to try in order.
+ *  Override with a comma-separated GEMINI_MODEL / GROQ_MODEL. */
+const DEFAULT_GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
+const DEFAULT_GROQ_MODELS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "openai/gpt-oss-20b"];
 
-  if (choice === "gemini") return gemini();
-  if (choice === "groq") return groq();
-  if (choice === "openai-compatible") return compat();
-  return gemini() ?? groq() ?? compat();
+const list = (v: string | undefined, fallback: string[]) => {
+  const items = (v ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  return items.length ? items : fallback;
+};
+
+function geminiChain(env: NodeJS.ProcessEnv): ModelProvider[] {
+  if (!env.GEMINI_API_KEY) return [];
+  return list(env.GEMINI_MODEL, DEFAULT_GEMINI_MODELS).map((m) => new GeminiProvider(env.GEMINI_API_KEY!, m));
+}
+function groqChain(env: NodeJS.ProcessEnv): ModelProvider[] {
+  if (!env.GROQ_API_KEY) return [];
+  return list(env.GROQ_MODEL, DEFAULT_GROQ_MODELS).map((m) => new OpenAICompatibleProvider(GROQ_URL, env.GROQ_API_KEY!, m, "groq"));
+}
+function compatChain(env: NodeJS.ProcessEnv): ModelProvider[] {
+  if (!env.OPENAI_COMPAT_BASE_URL || !env.OPENAI_COMPAT_MODEL) return [];
+  return [new OpenAICompatibleProvider(env.OPENAI_COMPAT_BASE_URL, env.OPENAI_COMPAT_API_KEY ?? "none", env.OPENAI_COMPAT_MODEL)];
 }
 
-/** Tries the primary provider, then the fallback if the first one is rate-limited, down,
- *  or refuses the model (403/404: free-tier access or model names change over time). */
+/** The single preferred provider (first model of the chosen/auto-detected provider). */
+export function getProvider(env: NodeJS.ProcessEnv = process.env): ModelProvider | null {
+  return orderedChain(env)[0] ?? null;
+}
+
+function orderedChain(env: NodeJS.ProcessEnv): ModelProvider[] {
+  const choice = (env.AI_PROVIDER ?? "").toLowerCase();
+  if (choice === "gemini") return geminiChain(env);
+  if (choice === "groq") return groqChain(env);
+  if (choice === "openai-compatible") return compatChain(env);
+  return [...geminiChain(env), ...groqChain(env), ...compatChain(env)];
+}
+
+/** Tries each provider/model in turn. Free tiers fail in many ways (429 quota,
+ *  403 access, 404 renamed model, 5xx), and any of them should hand over to the next. */
 export class FallbackProvider implements ModelProvider {
   readonly name: string;
   constructor(private providers: ModelProvider[]) {
@@ -187,8 +205,7 @@ export class FallbackProvider implements ModelProvider {
         return await p.complete(input);
       } catch (e) {
         last = e;
-        const retryable = !(e instanceof ProviderError) || [403, 404, 429].includes(e.status) || e.status >= 500;
-        if (!retryable) throw e;
+        console.warn(`[ai] ${p.name} failed:`, e instanceof ProviderError ? `${e.status} ${e.body.slice(0, 300)}` : e);
       }
     }
     throw last;
@@ -196,10 +213,7 @@ export class FallbackProvider implements ModelProvider {
 }
 
 export function getProviderChain(env: NodeJS.ProcessEnv = process.env): ModelProvider | null {
-  const primary = getProvider(env);
-  if (!primary) return null;
-  const extras: ModelProvider[] = [];
-  if (env.GROQ_API_KEY && !primary.name.startsWith("groq"))
-    extras.push(new OpenAICompatibleProvider("https://api.groq.com/openai/v1", env.GROQ_API_KEY, env.GROQ_MODEL || "llama-3.3-70b-versatile", "groq"));
-  return extras.length ? new FallbackProvider([primary, ...extras]) : primary;
+  const chain = orderedChain(env);
+  if (!chain.length) return null;
+  return chain.length === 1 ? chain[0] : new FallbackProvider(chain);
 }

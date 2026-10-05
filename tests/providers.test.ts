@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GeminiProvider, OpenAICompatibleProvider, getProvider } from "@/lib/agent/providers";
+import { FallbackProvider, GeminiProvider, OpenAICompatibleProvider, ProviderError, getProvider, getProviderChain } from "@/lib/agent/providers";
 import type { ToolSpec } from "@/lib/agent/types";
 
 const tools: ToolSpec[] = [
@@ -62,5 +62,21 @@ describe("getProvider", () => {
     expect(getProvider({ GEMINI_API_KEY: "a", GROQ_API_KEY: "b" } as unknown as NodeJS.ProcessEnv)?.name).toMatch(/^gemini/);
     expect(getProvider({ GROQ_API_KEY: "b" } as unknown as NodeJS.ProcessEnv)?.name).toMatch(/^groq/);
     expect(getProvider({} as unknown as NodeJS.ProcessEnv)).toBeNull();
+  });
+});
+
+describe("getProviderChain", () => {
+  it("lists every model of every configured provider, Gemini first", () => {
+    const chain = getProviderChain({ GEMINI_API_KEY: "a", GROQ_API_KEY: "b", GROQ_MODEL: "m1, m2" } as unknown as NodeJS.ProcessEnv);
+    expect(chain?.name).toBe("gemini:gemini-3.5-flash → gemini:gemini-2.5-flash → groq:m1 → groq:m2");
+  });
+
+  it("falls through any provider error to the next model", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fail = (status: number) => ({ name: `f${status}`, complete: async () => Promise.reject(new ProviderError(status, "x")) });
+    const ok = { name: "ok", complete: async () => ({ text: "hello" }) };
+    const chain = new FallbackProvider([fail(404), fail(400), fail(429), ok]);
+    await expect(chain.complete({ system: "s", messages: [], tools })).resolves.toEqual({ text: "hello" });
+    await expect(new FallbackProvider([fail(401)]).complete({ system: "s", messages: [], tools })).rejects.toBeInstanceOf(ProviderError);
   });
 });
