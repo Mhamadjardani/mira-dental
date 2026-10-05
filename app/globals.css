@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f6f8f7;
+  --color-surface: #ffffff;
+  --color-ink: #10292c;
+  --color-muted: #5b6f72;
+  --color-line: #e2e9e7;
+  --color-brand: #0f766e;
+  --color-brand-dark: #0b4f4a;
+  --color-mint: #dff3ee;
+  --color-sand: #f3ece2;
+  --color-coral: #e8775a;
+
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "Plus Jakarta Sans Variable", ui-sans-serif, sans-serif;
+
+  --radius-xl2: 1.25rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+html[lang="ar"] body {
+  font-family: var(--font-arabic);
+}
+
+::selection {
+  background: var(--color-mint);
+  color: var(--color-brand-dark);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.blob {
+  filter: blur(40px);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-bg);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.input:focus {
+  border-color: var(--color-brand);
+  background: var(--color-surface);
+}
