@@ -116,12 +116,13 @@ export function ChatWidget({ locale, t }: { locale: Locale; t: Dict["chat"] }) {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ sessionId: idRef.current, locale, text: clean }),
         });
+        if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { reply?: string; events?: BookingCard[]; status?: string };
         const reply = data.reply ?? "…";
         setMsgs((m) => [...m, { role: "assistant", text: reply, events: data.events, status: data.status }]);
         if (speak || fromVoice) say(reply);
       } catch {
-        setMsgs((m) => [...m, { role: "assistant", text: "⚠︎", status: "error" }]);
+        setMsgs((m) => [...m, { role: "assistant", text: t.failed, status: "error" }]);
       } finally {
         setBusy(false);
       }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FallbackProvider, GeminiProvider, OpenAICompatibleProvider, ProviderError, getProvider, getProviderChain } from "@/lib/agent/providers";
+import { FallbackProvider, GeminiProvider, geminiConfig, OpenAICompatibleProvider, ProviderError, getProvider, getProviderChain } from "@/lib/agent/providers";
 import type { ToolSpec } from "@/lib/agent/types";
 
 const tools: ToolSpec[] = [
@@ -78,5 +78,12 @@ describe("getProviderChain", () => {
     const chain = new FallbackProvider([fail(404), fail(400), fail(429), ok]);
     await expect(chain.complete({ system: "s", messages: [], tools })).resolves.toEqual({ text: "hello" });
     await expect(new FallbackProvider([fail(401)]).complete({ system: "s", messages: [], tools })).rejects.toBeInstanceOf(ProviderError);
+  });
+});
+
+describe("geminiConfig", () => {
+  it("keeps thinking low on Gemini 3+ and off on 2.x", () => {
+    expect(geminiConfig("gemini-3.5-flash")).toEqual({ thinkingConfig: { thinkingLevel: "low" } });
+    expect(geminiConfig("gemini-2.5-flash").thinkingConfig).toEqual({ thinkingBudget: 0 });
   });
 });

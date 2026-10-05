@@ -113,6 +113,7 @@ const en = {
     rescheduled: "Moved",
     disclaimer: "Demo assistant. Don't share sensitive health information.",
     open: "Chat with Mira",
+    failed: "Sorry, that took too long. Please try again, or use the booking form.",
   },
   errors: {
     generic: "Something went wrong. Please try again.",
@@ -231,6 +232,7 @@ const ar: Dict = {
     rescheduled: "تم النقل",
     disclaimer: "مساعدة تجريبية. لا تشارك معلومات صحية حساسة.",
     open: "تحدّث مع ميرا",
+    failed: "عذرًا، استغرق الأمر وقتًا طويلًا. حاول مجددًا أو استخدم نموذج الحجز.",
   },
   errors: { generic: "حدث خطأ ما. يرجى المحاولة مجددًا." },
   footer: { rights: "ميرا لطب الأسنان", made: "تصميم وتطوير محمد جرداني" },
@@ -345,6 +347,7 @@ const fr: Dict = {
     rescheduled: "Déplacé",
     disclaimer: "Assistante de démonstration. Ne partagez pas d'informations médicales sensibles.",
     open: "Discuter avec Mira",
+    failed: "Désolée, cela a pris trop de temps. Réessayez, ou utilisez le formulaire de réservation.",
   },
   errors: { generic: "Une erreur est survenue. Veuillez réessayer." },
   footer: { rights: "Mira Dental Studio", made: "Conçu et développé par Mohamad Jardani" },

@@ -2,7 +2,7 @@ import { handleChat } from "@/lib/agent/chat";
 import { clientIp, json, readJson } from "@/lib/http";
 import { isLocale } from "@/lib/i18n";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const b = await readJson<{ sessionId?: string; locale?: string; text?: string }>(req);

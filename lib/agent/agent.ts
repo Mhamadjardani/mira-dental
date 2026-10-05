@@ -5,6 +5,8 @@ import { runTool, TOOL_SPECS, type ToolEvent } from "./tools";
 import type { AgentMessage, ModelProvider } from "./types";
 
 const MAX_ROUNDS = 6;
+/** Stay well inside the serverless time limit (maxDuration on /api/chat). */
+const DEADLINE_MS = 42_000;
 const LANG_NAME: Record<string, string> = { en: "English", ar: "Arabic", fr: "French" };
 
 export function systemPrompt(locale: string, now = clinicNow()) {
@@ -42,7 +44,8 @@ export async function runAgent(input: {
   const toolLog: { name: string; ok: boolean }[] = [];
   const system = systemPrompt(input.locale);
 
-  for (let round = 0; round < MAX_ROUNDS; round++) {
+  const started = Date.now();
+  for (let round = 0; round < MAX_ROUNDS && Date.now() - started < DEADLINE_MS; round++) {
     const reply = await input.provider.complete({ system, messages, tools: TOOL_SPECS });
     messages.push({ role: "assistant", text: reply.text, calls: reply.calls, raw: reply.raw });
 

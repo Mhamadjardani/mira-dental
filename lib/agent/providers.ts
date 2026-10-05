@@ -6,15 +6,22 @@ import type { AgentMessage, ModelProvider, ModelReply, ToolCall, ToolSpec } from
    - Any OpenAI-compatible chat API: Groq, OpenRouter, a local Ollama, …
    Pick with AI_PROVIDER, or let it auto-detect from the keys that are set. */
 
-const TIMEOUT_MS = 25_000;
+/** Per model call. A slow model is treated like a failed one so the next can answer in time. */
+const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 12_000;
 
 async function postJson(url: string, body: unknown, headers: Record<string, string>) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...headers },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    throw new ProviderError(timedOut ? 504 : 502, timedOut ? `timed out after ${TIMEOUT_MS}ms` : String(e));
+  }
   const text = await res.text();
   if (!res.ok) throw new ProviderError(res.status, text.slice(0, 500));
   return JSON.parse(text);
@@ -46,6 +53,13 @@ const geminiSchema = (p: ToolSpec["parameters"]) => ({
   ),
   required: p.required ?? [],
 });
+
+/** Gemini 3+ thinks at "high" by default, which is slow for a receptionist: keep it low
+ *  (and leave temperature at its default, as Google recommends). 2.x: thinking off. */
+export function geminiConfig(model: string) {
+  const major = Number(/gemini-(\d+)/.exec(model)?.[1] ?? 0);
+  return major >= 3 ? { thinkingConfig: { thinkingLevel: "low" } } : { temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } };
+}
 
 export class GeminiProvider implements ModelProvider {
   readonly name: string;
@@ -82,7 +96,7 @@ export class GeminiProvider implements ModelProvider {
         systemInstruction: { parts: [{ text: system }] },
         contents,
         tools: [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parameters: geminiSchema(t.parameters) })) }],
-        generationConfig: { temperature: 0.3 },
+        generationConfig: geminiConfig(this.model),
       },
       { "x-goog-api-key": this.apiKey },
     );
@@ -193,6 +207,9 @@ function orderedChain(env: NodeJS.ProcessEnv): ModelProvider[] {
 
 /** Tries each provider/model in turn. Free tiers fail in many ways (429 quota,
  *  403 access, 404 renamed model, 5xx), and any of them should hand over to the next. */
+const COOLDOWN_MS = 60_000;
+const failedAt = new Map<string, number>();
+
 export class FallbackProvider implements ModelProvider {
   readonly name: string;
   constructor(private providers: ModelProvider[]) {
@@ -200,11 +217,18 @@ export class FallbackProvider implements ModelProvider {
   }
   async complete(input: Parameters<ModelProvider["complete"]>[0]) {
     let last: unknown;
-    for (const p of this.providers) {
+    // Models that failed in the last minute go to the back of the queue instead of costing time again.
+    const now = Date.now();
+    const fresh = (p: ModelProvider) => now - (failedAt.get(p.name) ?? 0) > COOLDOWN_MS;
+    const order = [...this.providers.filter(fresh), ...this.providers.filter((p) => !fresh(p))];
+    for (const p of order) {
       try {
-        return await p.complete(input);
+        const reply = await p.complete(input);
+        failedAt.delete(p.name);
+        return reply;
       } catch (e) {
         last = e;
+        failedAt.set(p.name, Date.now());
         console.warn(`[ai] ${p.name} failed:`, e instanceof ProviderError ? `${e.status} ${e.body.slice(0, 300)}` : e);
       }
     }
