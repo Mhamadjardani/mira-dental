@@ -40,7 +40,7 @@ export type ChatResponse = {
 };
 
 export async function handleChat(
-  input: { sessionId: string; locale: string; text: string; ip?: string },
+  input: { sessionId: string; locale: string; text: string; ip?: string; history?: { role: "user" | "assistant"; text: string }[] },
   provider: ModelProvider | null = getProviderChain(),
 ): Promise<ChatResponse> {
   const text = input.text.trim().slice(0, 600);
@@ -65,6 +65,12 @@ export async function handleChat(
     updatedAt: new Date().toISOString(),
   };
   const now = () => new Date().toISOString();
+  // No stored copy (new serverless instance, or memory was reset): rebuild context from
+  // the transcript the widget sent. Stored history is richer (it has tool results), so it wins.
+  if (!convo.messages.length && input.history?.length) {
+    convo.messages = input.history.map((m): AgentMessage => (m.role === "user" ? { role: "user", text: m.text } : { role: "assistant", text: m.text }));
+    if (!convo.turns.length) convo.turns = input.history.map((m) => ({ role: m.role, text: m.text, at: now() }));
+  }
   convo.turns.push({ role: "user", text, at: now() });
 
   try {

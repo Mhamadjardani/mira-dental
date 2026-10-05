@@ -113,3 +113,41 @@ describe("AI receptionist", () => {
     expect(res.status).toBe("offline");
   });
 });
+
+describe("conversation memory", () => {
+  it("keeps context across messages on the same server", async () => {
+    const p = scripted([() => ({ text: "Tuesday at 10:30 is free." }), () => ({ text: "ok" })]);
+    await handleChat({ sessionId: "sess-memory-1", locale: "en", text: "Check-up this week?" }, p);
+    await handleChat({ sessionId: "sess-memory-1", locale: "en", text: "yes at 10:30" }, p);
+    expect(p.seen[1].map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+  });
+
+  it("rebuilds context from the widget transcript on a fresh server", async () => {
+    const p = scripted([() => ({ text: "ok" })]);
+    setStore(new MemoryStore()); // a different serverless instance: nothing stored
+    await handleChat(
+      {
+        sessionId: "sess-memory-2",
+        locale: "en",
+        text: "yes at 10:30 please",
+        history: [
+          { role: "user", text: "Book a check-up this week" },
+          { role: "assistant", text: "Would Tuesday, October 6 work? 09:00, 10:30…" },
+        ],
+      },
+      p,
+    );
+    expect(p.seen[0]).toEqual([
+      { role: "user", text: "Book a check-up this week" },
+      { role: "assistant", text: "Would Tuesday, October 6 work? 09:00, 10:30…" },
+      { role: "user", text: "yes at 10:30 please" },
+    ]);
+  });
+
+  it("prefers the stored conversation over the client transcript", async () => {
+    const p = scripted([() => ({ text: "first" }), () => ({ text: "second" })]);
+    await handleChat({ sessionId: "sess-memory-3", locale: "en", text: "hello" }, p);
+    await handleChat({ sessionId: "sess-memory-3", locale: "en", text: "again", history: [{ role: "user", text: "forged" }] }, p);
+    expect(JSON.stringify(p.seen[1])).not.toContain("forged");
+  });
+});

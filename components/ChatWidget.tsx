@@ -108,13 +108,24 @@ export function ChatWidget({ locale, t }: { locale: Locale; t: Dict["chat"] }) {
       if (!clean || busy) return;
       if (!idRef.current) idRef.current = sessionId();
       setInput("");
+      // Recent visible conversation, sent as a backup memory: the server prefers its own
+      // stored copy, but serverless instances without a database don't share memory.
+      const history = msgs
+        .filter((m) => m.status !== "error")
+        .slice(-12)
+        .map((m) => ({
+          role: m.role,
+          text: [m.text, ...(m.events ?? []).map((e) => `[${e.type} ${e.booking.code}: ${e.booking.serviceId}, ${e.booking.date} ${e.booking.start}, ${e.booking.dentist}]`)]
+            .join(" ")
+            .slice(0, 800),
+        }));
       setMsgs((m) => [...m, { role: "user", text: clean }]);
       setBusy(true);
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sessionId: idRef.current, locale, text: clean }),
+          body: JSON.stringify({ sessionId: idRef.current, locale, text: clean, history }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { reply?: string; events?: BookingCard[]; status?: string };
@@ -127,7 +138,7 @@ export function ChatWidget({ locale, t }: { locale: Locale; t: Dict["chat"] }) {
         setBusy(false);
       }
     },
-    [busy, locale, say, speak, t.failed],
+    [busy, locale, msgs, say, speak, t.failed],
   );
 
   function toggleMic() {
